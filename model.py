@@ -9,13 +9,32 @@ from transformers import AutoTokenizer, AutoModelForVideoClassification
 import av
 import numpy as np
 import torch
-
+import torchvision
 from transformers import VivitImageProcessor, VivitForVideoClassification
 from huggingface_hub import hf_hub_download
 
 from datasets import load_dataset
+from torch.utils.data import DataLoader
 
-dataset = load_dataset("AlexFierro9/Kinetics400")
+
+from datasets import load_dataset
+
+#dataset = load_dataset("AlexFierro9/Kinetics400")
+
+# dataset = load_dataset("kiyoonkim/kinetics-400-splits")
+# train_dataset = load_dataset("kiyoonkim/kinetics-400-splits", split="train")
+# valid_dataset = load_dataset("kiyoonkim/kinetics-400-splits", split="validation")
+# test_dataset  = load_dataset("kiyoonkim/kinetics-400-splits", split="test")
+# print(train_dataset)
+# for example in train_dataset:
+#     print(example)
+# #dataloader = DataLoader(dataset, batch_size=10, shuffle=True)
+
+# # Iterate over the data
+# for video, audio, label in dataloader:
+#     print(video.shape, audio.shape, label)
+
+#dataset = load_dataset("AlexFierro9/Kinetics400")
 
 np.random.seed(0)
 
@@ -63,16 +82,15 @@ def sample_frame_indices(clip_len, frame_sample_rate, seg_len):
 file_path = hf_hub_download(
     repo_id="nielsr/video-demo", filename="eating_spaghetti.mp4", repo_type="dataset"
 )
-
-file_path = hf_hub_download(
-    repo_id="nateraw/kinetics", filename=""
-)
+file_path = '/home/ofoo/MoEViT/kinetics-dataset/k400/train/-_1WRslPhMo_000173_000183.mp4'
 container = av.open(file_path)
 
 # sample 32 frames
 indices = sample_frame_indices(clip_len=32, frame_sample_rate=4, seg_len=container.streams.video[0].frames)
 video = read_video_pyav(container=container, indices=indices)
-
+print("testaiosjglkagjakgjaslASLKGJALKGJASLKGJASLKGJASKL GJSALKG ALSG JASLKG JASILG JAKLSG JLSAG JAKLSG JAKLS JGILSD ")
+print(video)
+print(type(video))
 image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
 model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
 
