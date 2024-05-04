@@ -86,17 +86,35 @@ file_path = '/home/ofoo/MoEViT/kinetics-dataset/k400/train/-_1WRslPhMo_000173_00
 container = av.open(file_path)
 
 # sample 32 frames
-indices = sample_frame_indices(clip_len=32, frame_sample_rate=4, seg_len=container.streams.video[0].frames)
+indices = sample_frame_indices(clip_len=32, frame_sample_rate=1, seg_len=container.streams.video[0].frames)
 video = read_video_pyav(container=container, indices=indices)
 print("testaiosjglkagjakgjaslASLKGJALKGJASLKGJASLKGJASKL GJSALKG ALSG JASLKG JASILG JAKLSG JLSAG JAKLSG JAKLS JGILSD ")
 print(video)
-print(type(video))
+print(type(video))  
 image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
 model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
 
-print(video)
 inputs = image_processor(list(video), return_tensors="pt")
+inputs = inputs['pixel_values'].numpy()
+inputs = inputs.tolist()
+import json
+# Example data
+label = "LABEL12"  # This should be the output label for the video
 
+# Create a dictionary to store your data
+video_entry = {
+    "input": inputs,
+    "output": label
+}
+
+
+# File path to your .jsonl file
+file_path = 'your_dataset.jsonl'
+
+# Write the dictionary as a JSON line to the .jsonl file
+with open(file_path, 'a') as file:  # 'a' is for append mode
+    json.dump(video_entry, file)
+    file.write('\n')  # Ensure it starts a new line for the next entry
 with torch.no_grad():
     outputs = model(**inputs)
     logits = outputs.logits

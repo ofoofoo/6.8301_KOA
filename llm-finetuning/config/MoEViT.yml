@@ -1,27 +1,30 @@
 # base_model: mistralai/Mistral-7B-v0.1
-base_model: ofoofoo/resnet18-test
-tokenizer_type: LlamaTokenizer
-is_mistral_derived_model: false
+base_model: google/vivit-b-16x2-kinetics400
 
 load_in_8bit: false
 load_in_4bit: false
 strict: false
 
+train_on_inputs: false # Mask segments of your data
 datasets:
-  # This will be the path used for the data when it is saved to the Volume in the cloud.
-  - path: data.jsonl
-    ds_type: json
-    type:
-      # JSONL file contains question, context, answer fields per line.
-      # This gets mapped to instruction, input, output axolotl tags.
-      field_instruction: question
-      field_input: context
-      field_output: answer
-      # Format is used by axolotl to generate the prompt.
-      format: |-
-        [INST] Using the schema context below, generate a SQL query that answers the question.
-        {input}
-        {instruction} [/INST] 
+  - path: output.jsonl
+    type: input_output  # use template free prompt construction
+
+# datasets:
+#   # This will be the path used for the data when it is saved to the Volume in the cloud.
+#   - path: data.jsonl
+#     ds_type: json
+#     type:
+#       # JSONL file contains question, context, answer fields per line.
+#       # This gets mapped to instruction, input, output axolotl tags.
+#       field_instruction: question
+#       field_input: context
+#       field_output: answer
+#       # Format is used by axolotl to generate the prompt.
+#       format: |-
+#         [INST] Using the schema context below, generate a SQL query that answers the question.
+#         {input}
+#         {instruction} [/INST] 
 
 dataset_prepared_path:
 val_set_size: 0.05
@@ -73,7 +76,7 @@ deepspeed: /root/axolotl/deepspeed_configs/zero3_bf16.json
 weight_decay: 0.0
 fsdp:
 fsdp_config:
-special_tokens:
-  bos_token: "<s>"
-  eos_token: "</s>"
-  unk_token: "<unk>"
+# special_tokens:
+#   bos_token: "<s>"
+#   eos_token: "</s>"
+#   unk_token: "<unk>"
