@@ -38,6 +38,31 @@ from datasets import load_dataset
 
 np.random.seed(0)
 
+class MoEModel(nn.Module):
+    def __init__(self, num_experts=10, hidden_size=512):
+        resnet18 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
+        model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
+        super(MoEModel, self).__init__() 
+        self.gate = Top2Gate(model_dim=hidden_size, num_experts=num_experts)
+        
+        # Change below to whatever we want our experts to be!
+        # self.experts = nn.ModuleList([
+        #     nn.Sequential(
+        #         nn.Linear(hidden_size, hidden_size),
+        #         nn.ReLU(),
+        #         nn.Linear(hidden_size, hidden_size)
+        #     ) for _ in range(num_experts)
+        # ])
+        self.experts = nn.ModuleList([
+            model for _ in range(num_experts)
+        ])
+        
+        self.moe_layer = MOELayer(self.gate, self.experts)
+
+    def forward(self, x):
+        output, loss = self.moe_layer(x)
+        return output,loss
+
 
 def read_video_pyav(container, indices):
     '''
@@ -78,73 +103,44 @@ def sample_frame_indices(clip_len, frame_sample_rate, seg_len):
     return indices
 
 
-# video clip consists of 300 frames (10 seconds at 30 FPS)
-file_path = hf_hub_download(
-    repo_id="nielsr/video-demo", filename="eating_spaghetti.mp4", repo_type="dataset"
-)
-file_path = '/home/ofoo/MoEViT/kinetics-dataset/k400/train/-_1WRslPhMo_000173_000183.mp4'
-container = av.open(file_path)
+# # video clip consists of 300 frames (10 seconds at 30 FPS)
+# file_path = hf_hub_download(
+#     repo_id="nielsr/video-demo", filename="eating_spaghetti.mp4", repo_type="dataset"
+# )
+# file_path = '/home/ofoo/MoEViT/kinetics-dataset/k400/train/-_1WRslPhMo_000173_000183.mp4'
+# container = av.open(file_path)
 
-# sample 32 frames
-indices = sample_frame_indices(clip_len=32, frame_sample_rate=1, seg_len=container.streams.video[0].frames)
-video = read_video_pyav(container=container, indices=indices)
-print("testaiosjglkagjakgjaslASLKGJALKGJASLKGJASLKGJASKL GJSALKG ALSG JASLKG JASILG JAKLSG JLSAG JAKLSG JAKLS JGILSD ")
-print(video)
-print(type(video))  
-image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
-model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
+# # sample 32 frames
+# indices = sample_frame_indices(clip_len=32, frame_sample_rate=1, seg_len=container.streams.video[0].frames)
+# video = read_video_pyav(container=container, indices=indices)
+# print("testaiosjglkagjakgjaslASLKGJALKGJASLKGJASLKGJASKL GJSALKG ALSG JASLKG JASILG JAKLSG JLSAG JAKLSG JAKLS JGILSD ")
+# print(video.shape)
+# print(type(video)) 
+# image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
+# #model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
+# model = MoEModel(num_experts=10, hidden_size=512)
+# inputs = image_processor(list(video), return_tensors="pt")
+# inputs = inputs['pixel_values']
+# import json
+# # Example data
+# label = "LABEL12"  # This should be the output label for the video
 
-inputs = image_processor(list(video), return_tensors="pt")
-inputs = inputs['pixel_values'].numpy()
-inputs = inputs.tolist()
-import json
-# Example data
-label = "LABEL12"  # This should be the output label for the video
-
-# Create a dictionary to store your data
-video_entry = {
-    "input": inputs,
-    "output": label
-}
+# # Create a dictionary to store your data
+# video_entry = {
+#     "input": inputs,
+#     "output": label
+# }
 
 
-# File path to your .jsonl file
-file_path = 'your_dataset.jsonl'
+# # File path to your .jsonl file
+# file_path = 'your_dataset.jsonl'
 
-# Write the dictionary as a JSON line to the .jsonl file
-with open(file_path, 'a') as file:  # 'a' is for append mode
-    json.dump(video_entry, file)
-    file.write('\n')  # Ensure it starts a new line for the next entry
-with torch.no_grad():
-    outputs = model(**inputs)
-    logits = outputs.logits
 
-# model predicts one of the 400 Kinetics-400 classes
-predicted_label = logits.argmax(-1).item()
-print(model.config.id2label[predicted_label])
+# with torch.no_grad():
+#     outputs = model(inputs)
+#     logits = outputs.logits
 
-class MoEModel(nn.Module):
-    def __init__(self, num_experts=10, hidden_size=512):
-        resnet18 = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-        model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
-        print(model)
-        super(MoEModel, self).__init__() 
-        self.gate = Top2Gate(model_dim=hidden_size, num_experts=num_experts)
-        
-        # Change below to whatever we want our experts to be!
-        # self.experts = nn.ModuleList([
-        #     nn.Sequential(
-        #         nn.Linear(hidden_size, hidden_size),
-        #         nn.ReLU(),
-        #         nn.Linear(hidden_size, hidden_size)
-        #     ) for _ in range(num_experts)
-        # ])
-        self.experts = nn.ModuleList([
-            model for _ in range(num_experts)
-        ])
-        
-        self.moe_layer = MOELayer(self.gate, self.experts)
+# # model predicts one of the 400 Kinetics-400 classes
+# predicted_label = logits.argmax(-1).item()
+# print(model.config.id2label[predicted_label])
 
-    def forward(self, x):
-        output, loss = self.moe_layer(x)
-        return output,loss
