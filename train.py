@@ -24,7 +24,6 @@ import torchvision.transforms as transforms
 from fairscale.nn import MOELayer, Top2Gate
 import os
 import av
-
 from model import MoEModel, sample_frame_indices, read_video_pyav
 from transformers import VivitImageProcessor, VivitForVideoClassification
 
@@ -36,9 +35,8 @@ backend = 'nccl' if device.type == 'cuda' else 'gloo'
 dist.init_process_group(backend=backend, init_method='env://', rank=0, world_size=1)
 
 
-###### Model we will be using 
+###### Model - MOE we will be using 
 model = MoEModel(num_experts=8, hidden_size=512).to(device)
-print(model)
 
 ####### testing data shape
 
@@ -59,4 +57,6 @@ inputs = inputs['pixel_values']
 print(f'Kinetics 400 Video shape: {video.shape}')
 
 
-#what
+#what should the input to the model be?
+output= model(inputs)
+print(output)
