@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import torchvision
 from transformers import VivitImageProcessor, VivitForVideoClassification
+from transformers import VivitConfig, VivitModel
 from huggingface_hub import hf_hub_download
 
 from datasets import load_dataset

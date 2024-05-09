@@ -66,10 +66,13 @@ class MOELayer(Base):
         self.num_local_experts = len(self.experts)
 
     def forward(self, *input: Tensor, **kwargs: Any) -> Tensor:
+        print(f"Input into MOELayer: {input[0].shape}")
         assert len(input) == 1, "only single input Tensor supported"
         assert len(input[0].shape) == 3, "input Tensor must have dimensions: (s)equence, (t)oken, (m)odel"
+        print(input[0].shape[0])
         assert input[0].shape[0] % len(self.experts) == 0, "num tokens must be order of number of local experts"
 
+        #input[0] = input[0].view(1, 32, 3, 224, 224)
         # Implement Algorithm 2 from GShard paper.
         d_model = input[0].shape[2]
         # Reshape into S tokens by dropping sequence dimension.
