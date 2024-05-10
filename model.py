@@ -23,8 +23,6 @@ dataset = load_dataset("theodor1289/imagenet-1k_tiny")
 import torch.nn.functional as F
 from functools import partial
 
-#dataset = load_dataset("AlexFierro9/Kinetics400")
-
 # dataset = load_dataset("kiyoonkim/kinetics-400-splits")
 # train_dataset = load_dataset("kiyoonkim/kinetics-400-splits", split="train")
 # valid_dataset = load_dataset("kiyoonkim/kinetics-400-splits", split="validation")
@@ -100,9 +98,9 @@ moe = SoftMoE(
     num_experts = 4    # number of experts - (they suggest number of experts should be high enough that each of them get only 1 slot. wonder if that is the weakness of the paper?)
 )
 
-x = torch.randn(1, 1024, 512)
+print(moe)
+x = torch.rand(1, 3, 224, 224)
 
-print('heasjfka')
 out = moe(x) + x # (1, 1024, 512) - add in a transformer in place of a feedforward at a certain layer (here showing the residual too)
 print(out)
 class MoEModel(nn.Module):
