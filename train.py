@@ -24,17 +24,17 @@ import torchvision.transforms as transforms
 from fairscale.nn import MOELayer, Top2Gate
 import os
 import av
-from model import MoEModel, sample_frame_indices, read_video_pyav, MLPMixer, CIFAR10_MLP_Mixer, ConvMixer
 from transformers import VivitImageProcessor, VivitForVideoClassification
 import numpy as np
 from transformers import VivitConfig, VivitModel
+from soft_moe_pytorch import SoftMoE
 
 
 # Setup distributed environment
 os.environ['MASTER_ADDR'] = 'localhost'
 os.environ['MASTER_PORT'] = '12355'
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cpu")
 backend = 'nccl' if device.type == 'cuda' else 'gloo'
 dist.init_process_group(backend=backend, init_method='env://', rank=0, world_size=1)
 
@@ -50,6 +50,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 from torchinfo import summary
+from model import MoE_Layer, MoE_Model
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -60,8 +61,12 @@ def train(args, model, device, train_loader, optimizer, epoch):
     
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
+        print(data.shape)
+        data = data[0]
         optimizer.zero_grad()
         output = model(data)
+        print(target.shape)
+        print(output.shape)
         loss = F.nll_loss(output, target)
         loss.backward()
         optimizer.step()
@@ -165,7 +170,15 @@ def main():
     test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
     #Initialize the model
     
-    model = ConvMixer(128, 8, kernel_size=8, patch_size=1, n_classes=10).to(device)
+    #model = ConvMixer(128, 8, kernel_size=8, patch_size=1, n_classes=10).to(device)
+    image_dim = 3
+    num_experts = 4
+    hidden_dim = 10
+    output_dim = 10
+    input_dim=32*32*3
+    #model = MoEModel(input_dim=input_dim, image_dim=image_dim, num_experts=num_experts, hidden_dim=hidden_dim, output_dim=output_dim).to(device)
+    model = MoE_Model().to(device)
+    print(model)
     total_params = sum(p.numel() for p in model.parameters())
     
     print(total_params)

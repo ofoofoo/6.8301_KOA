@@ -89,13 +89,8 @@ def top2gating(logits: torch.Tensor) -> Tuple[Tensor, Tensor, Tensor]:
     # Calculate combine_weights and dispatch_mask
     gates1 = gates1_s.unsqueeze(-1) * mask1  # einsum("s,se->se")
     gates2 = gates2_s.unsqueeze(-1) * mask2  # einsum("s,se->se")
-    print("gates1 shape:", gates1.shape)
-    print("gates2 shape:", gates2.shape)
-
     locations1_sc = one_hot(locations1_s, num_classes=capacity)
     locations2_sc = one_hot(locations2_s, num_classes=capacity)
-    print("locations1_sc shape:", locations1_sc.shape)
-
     combine1_sec = gates1.unsqueeze(2) * locations1_sc.unsqueeze(1)  # einsum("se,sc->sec")
     combine2_sec = gates2.unsqueeze(2) * locations2_sc.unsqueeze(1)  # einsum("se,sc->sec")
     combine_weights = combine1_sec + combine2_sec

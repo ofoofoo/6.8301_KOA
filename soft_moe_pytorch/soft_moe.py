@@ -13,6 +13,8 @@ from soft_moe_pytorch.distributed import (
     has_only_one_value
 )
 
+device = torch.device("cuda")
+
 # helper functions
 
 def exists(val):
@@ -70,12 +72,14 @@ class LayerNorm(nn.Module):
 class RMSNorm(Module):
     def __init__(self, dim):
         super().__init__()
-        self.scale = dim ** 0.5
+        self.scale = (dim ** 0.5)
         self.gamma = nn.Parameter(torch.ones(dim))
 
     def forward(self, x):
-        print("AKJFKLJFKLFA")
-        return l2norm(x) * self.scale * self.gamma
+        print(f"size of x in RMSNorm: {x.shape}")
+        print(f"self.scale: {self.scale}")
+        print(f"self.gamma: {self.gamma.shape}")
+        return l2norm(x.to(device)) * self.scale * self.gamma.to(device)
 
 # expert
 
@@ -84,18 +88,20 @@ def FeedForward(
     mult = 4,
     dropout = 0.
 ):
-    # dim_hidden = int(dim * mult)
-    # return nn.Sequential(
-    #     nn.Linear(dim, dim_hidden),
-    #     nn.GELU(),
-    #     nn.Dropout(dropout),
-    #     nn.Linear(dim_hidden, dim)
-    # )
-    return timm.create_model('convmixer_768_32.in1k', pretrained=True)
+    dim_hidden = int(dim * mult)
+    return nn.Sequential(
+        nn.Linear(dim, dim_hidden),
+        nn.GELU(),
+        nn.Dropout(dropout),
+        nn.Linear(dim_hidden, dim)
+    )
+    # return timm.create_model('convmixer_768_32.in1k', pretrained=True) #Input is 1*3*224*224
 
 class GEGLU(Module):
     def forward(self, x):
+        print("shape of x befoe chunking ", x.shape)
         x, gate = x.chunk(2, dim = -1)
+        print("shape of x after chunking ",x.shape)
         return x * F.gelu(gate)
 
 def GLUFeedForward(
@@ -111,6 +117,8 @@ def GLUFeedForward(
         nn.Dropout(dropout),
         nn.Linear(dim_hidden, dim)
     )
+    
+    # return timm.create_model('convmixer_768_32.in1k', pretrained=True) #Input is 1*3*224*224
 
 # experts
 
@@ -172,7 +180,7 @@ class Experts(nn.Module):
 
         is_distributed = default(is_distributed, self.is_distributed)
         shape, num_experts = x.shape, self.num_experts
-
+        print("shape at beginning ", shape)
         # for now naively all gather across batch dimension if distributed, optimize later
 
         if is_distributed:
@@ -243,10 +251,11 @@ class Experts(nn.Module):
         experts = self.experts[expert_slice]
 
         # route tokens to appropriate experts
-
+        print("input going in ", x.shape)
         outs = []
         for expert, expert_input in zip(experts, x):
-            out = expert(expert_input)
+            print("input going inside zip ", expert_input.shape)
+            out = expert(expert_input.to(device)).to(device)
             outs.append(out)
 
         if len(outs) > 0:
@@ -283,14 +292,13 @@ class SoftMoE(Module):
         num_slots = None,
         expert_mult = 4,
         dropout = 0.,
-        geglu = False,
+        geglu = True,
         is_distributed = None,
         offload_unused_experts_to_cpu = True,
         use_layernorm = False
     ):
         super().__init__()
         assert exists(seq_len) ^ exists(num_slots), 'either seq_len, or num_slots must be passed into SoftMoE'
-        print("AFJKFJ")
         if exists(seq_len):
             num_slots = default(num_slots, seq_len // num_experts)
         elif exists(num_slots):
@@ -302,8 +310,8 @@ class SoftMoE(Module):
         self.slot_norm = norm_klass(dim)
         self.slot_embeds = nn.Parameter(torch.randn(num_experts, num_slots, dim))
 
-        expert_klass = GLUFeedForward if geglu else FeedForward
-
+        # expert_klass = GLUFeedForward if geglu else FeedForward
+        expert_klass = GLUFeedForward
         self.experts = Experts(
             experts = [expert_klass(dim = dim, mult = expert_mult, dropout = dropout) for _ in range(num_experts)],
             is_distributed = is_distributed,
@@ -319,10 +327,10 @@ class SoftMoE(Module):
         s - number of slots per expert
         d - feature dimension
         """
-
+        print(f"x.ndim fed into softmoe forward:{x.ndim}")
         is_single_token = x.ndim == 2
         is_image = x.ndim == 4
-
+        print(f"x.shape fed into softmoe forward:{x.shape}")
         if is_image:
             x = rearrange(x, 'b d h w -> b h w d')
             x, ps = pack([x], 'b * d')
@@ -330,7 +338,7 @@ class SoftMoE(Module):
             x = rearrange(x, 'b d -> b 1 d')
 
         # following Algorithm 1, with the normalization they proposed, but with scaling of both (the now popular rmsnorm + gamma)
-
+        print(f"x in softmoe forward: {x.shape}")
         x = self.norm(x)
         slot_embeds = self.slot_norm(self.slot_embeds)
 
@@ -349,25 +357,28 @@ class SoftMoE(Module):
             logits = logits.masked_fill(~mask, -torch.finfo(logits.dtype).max)
 
         # get dispatch and combine weights (softmax across right dimensions)
-
+        print(f"logits in softmoe forward: {logits.shape}")
         dispatch_weights = logits.softmax(dim = 1)
 
         combine_weights = rearrange(logits, 'b n e s -> b n (e s)')
         combine_weights = combine_weights.softmax(dim = -1)
 
         # derive slots by weighted average of input tokens using the dispatch weights from above
+        print(f"x before slots einsum: {x.shape}")
+        print(f"dispatch_weights before slots einsum: {dispatch_weights.shape}")
 
-        slots = einsum('b n d, b n e s -> b e s d', x, dispatch_weights)
-
+        slots = einsum('b n d, b n e s -> b e s d', x.to(device), dispatch_weights)
+        print(f"slots after einsum: {slots.shape}")
         # route the slots per expert to each expert
 
-        out = self.experts(slots)
+        
+        out = self.experts(slots).to(device)
 
         # combine back out
-
+        print("out shape before rearrange, ", out.shape)
         out = rearrange(out, ' b e s d -> b (e s) d')
         out = einsum('b s d, b n s -> b n d', out, combine_weights)
-
+        print("out shape, ", out.shape)
         if is_image:
             out, = unpack(out, ps, 'b * d')
             out = rearrange(out, 'b h w d -> b d h w')

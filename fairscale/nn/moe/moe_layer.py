@@ -1,12 +1,15 @@
+# Copyright (c) Facebook, Inc. and its affiliates. All rights reserved.
+#
+# This source code is licensed under the BSD license found in the
+# LICENSE file in the root directory of this source tree.
+
 from typing import TYPE_CHECKING, Any, Optional, Tuple, Union, cast
 
 import torch
 from torch import Tensor
 import torch.distributed as dist
 from torch.nn import Module, ModuleList
-import numpy as np
-import sys
-# np.set_printoptions(threshold=np.inf)
+from einops import rearrange
 
 if TYPE_CHECKING:
     Base = Module[Tensor]
@@ -67,32 +70,22 @@ class MOELayer(Base):
         assert len(input) == 1, "only single input Tensor supported"
         assert len(input[0].shape) == 3, "input Tensor must have dimensions: (s)equence, (t)oken, (m)odel"
         assert input[0].shape[0] % len(self.experts) == 0, "num tokens must be order of number of local experts"
-        print("input into moe:")
-        print(input[0].shape)
+
         # Implement Algorithm 2 from GShard paper.
         d_model = input[0].shape[2]
         # Reshape into S tokens by dropping sequence dimension.
         reshaped_input = input[0].reshape(-1, d_model)
-        print('reshaped_input')
-        print(reshaped_input.shape)
         self.l_aux, combine_weights, dispatch_mask = self.gate(reshaped_input)
         dispatched_input = torch.einsum("sec,sm->ecm", dispatch_mask.float(), reshaped_input)
-        print('dispacted_input before AlltoAll')
-        print(dispatched_input.shape)
         dispatched_input = _AllToAll.apply(self.group, dispatched_input)
-        print('dispacted_input after AlltoAll')
-        print(dispatched_input.shape)
         # Re-shape after all-to-all: ecm -> gecm
         dispatched_input = dispatched_input.reshape(self.world_size, self.num_local_experts, -1, d_model)
-        print('dispatched_input after reshaping:')
-        print(dispatched_input.shape)
         chunks = dispatched_input.chunk(self.num_local_experts, dim=1)
-        print("chunks:")
-        #print(np.shape(np.array(chunks.cpu())))
         expert_outputs = []
         for chunk, expert in zip(chunks, self.experts):
-        #     chunk2= chunk.view(1, 32, 3, 112, 112)
-        #     chunk3=dispatched_input.view(2, 32, 3, 224, 224)
+            chunk = rearrange(chunk, 'a b c d -> a (b c d)')
+            expert_chunk = expert(chunk)
+            print(expert_chunk.shape)
             expert_outputs += [expert(chunk)]
         expert_output = torch.cat(expert_outputs, dim=1)
         expert_output = _AllToAll.apply(self.group, expert_output)
