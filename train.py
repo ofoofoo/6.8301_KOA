@@ -50,7 +50,7 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 from torchinfo import summary
-from model import MoE_Layer, MoE_Model
+from model import *
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -61,14 +61,10 @@ def train(args, model, device, train_loader, optimizer, epoch):
     
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
-        print(data.shape)
-        #data = data[0]
         optimizer.zero_grad()
         output = model(data)
-        print(output)
-        print(target.shape)
-        print(output.shape)
-        loss = F.nll_loss(output, target)
+        
+        loss = F.cross_entropy(output, target)
         loss.backward()
         optimizer.step()
         if batch_idx % args.log_interval == 0:
@@ -89,7 +85,7 @@ def test(model, device, test_loader):
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
             output = model(data)
-            test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
+            test_loss += F.cross_entropy(output, target, reduction='sum').item()  # sum up batch loss
             pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
             correct += pred.eq(target.view_as(pred)).sum().item()
 
@@ -103,8 +99,32 @@ def test(model, device, test_loader):
 def main():
     
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch CIFAR-10 MLP Mixer')
-    
+    parser = argparse.ArgumentParser(description='PyTorch Scaling KANs')
+
+    parser.add_argument('--cifar10', action='store_true', default=False,
+                        help='whether to use cifar-10 dataset')
+
+    parser.add_argument('--cifar100', action='store_true', default=False,
+                        help='whether to use cifar-100 dataset')    
+                                        
+    parser.add_argument('--MNIST', action='store_true', default=False,
+                        help='whether to use MNIST dataset')
+
+    parser.add_argument('--MLP', action='store_true', default=False,
+                        help='whether to use vanilla MLP')
+
+    parser.add_argument('--KAN', action='store_true', default=False,
+                        help='whether to use vanilla KAN')    
+                                        
+    parser.add_argument('--MOEMLP', action='store_true', default=False,
+                        help='whether to use MOE MLP')
+
+    parser.add_argument('--MOEKAN', action='store_true', default=False,
+                        help='whether to use MOE KAN')
+
+    parser.add_argument('--num_experts', type=int, default=4, metavar='N',
+                        help='number of MOE experts (default: 4)')
+
     parser.add_argument('--batch-size', type=int, default=100, metavar='N',
                         help='input batch size for training (default: 64)')
     
@@ -160,31 +180,88 @@ def main():
         train_kwargs.update(cuda_kwargs)
         test_kwargs.update(cuda_kwargs)
 
-    transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-    # Load CIFAR-10 Data
-    dataset_train = datasets.CIFAR10(root='./data', train=True,
-                                            download=True, transform=transform)
-    train_loader = torch.utils.data.DataLoader(dataset_train, **train_kwargs)
-    dataset_test = datasets.CIFAR10(root='./data', train=False,
-                                       download=True, transform=transform)
-    test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
+    # DATA
+
+
+
+    if args.cifar10:
+        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+        # Load CIFAR-10 Data
+        dataset_train = datasets.CIFAR10(root='./data', train=True,
+                                                download=True, transform=transform)
+        train_loader = torch.utils.data.DataLoader(dataset_train, **train_kwargs)
+        dataset_test = datasets.CIFAR10(root='./data', train=False,
+                                        download=True, transform=transform)
+        test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
+        if args.MLP:
+            model = MLP_CIFAR10()
+        elif args.KAN:
+            model = KAN_CIFAR10()
+
+        elif args.MOEMLP:
+            trained_experts = [MLP_CIFAR10() for _ in range(args.num_experts)]
+            print(trained_experts)
+            model = MOE(trained_experts, args.num_experts)
+
+        elif args.MOEKAN:
+            trained_experts = [KAN_CIFAR10() for _ in range(args.num_experts)]
+            model = MOE(trained_experts, args.num_experts)
+    
+    elif args.cifar100:
+        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+
+        # Load CIFAR-10 Data
+        dataset_train = datasets.CIFAR100(root='./data', train=True,
+                                                download=True, transform=transform)
+        train_loader = torch.utils.data.DataLoader(dataset_train, **train_kwargs)
+        dataset_test = datasets.CIFAR100(root='./data', train=False,
+                                        download=True, transform=transform)
+        test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
+        if args.MLP:
+            model = MLP_CIFAR100()
+        elif args.KAN:
+            model = KAN_CIFAR100()
+
+        elif args.MOEMLP:
+            trained_experts = [MLP_CIFAR100() for _ in range(args.num_experts)]
+            model = MOE(trained_experts, 3072)
+
+        elif args.MOEKAN:
+            trained_experts = [KAN_CIFAR100() for _ in range(args.num_experts)]
+            model = MOE(trained_experts, 3072)
+
+    
+    elif args.MNIST:
+        transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+        dataset_train = datasets.MNIST('../data', train=True, download=True,
+                            transform=transform)
+        dataset_test = datasets.MNIST('../data', train=False,
+                            transform=transform)
+        train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
+        test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
+
+        if args.MLP:
+            model = MLP_MNIST()
+        elif args.KAN:
+            model = KAN_MNIST()
+
+        elif args.MOEMLP:
+            trained_experts = [MLP_MNIST() for _ in range(args.num_experts)]
+            model = MOE(trained_experts, 28*28)
+
+        elif args.MOEKAN:
+            trained_experts = [KAN_MNIST() for _ in range(args.num_experts)]
+            model = MOE(trained_experts, 28*28)
     #Initialize the model
     
-    #model = ConvMixer(128, 8, kernel_size=8, patch_size=1, n_classes=10).to(device)
-    image_dim = 3
-    num_experts = 4
-    hidden_dim = 10
-    output_dim = 10
-    input_dim=32*32*3
-    #model = MoEModel(input_dim=input_dim, image_dim=image_dim, num_experts=num_experts, hidden_dim=hidden_dim, output_dim=output_dim).to(device)
-    model = MoE_Model().to(device)
+    model = model.to(device)
     print(model)
+
     total_params = sum(p.numel() for p in model.parameters())
     
-    print(total_params)
-
-      
+    print(f'Total parameters: {total_params}')
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr) #args.lr
 
@@ -205,47 +282,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# input = torch.rand(32, 32, 32)
-
-# ####### testing data shape
-# print(model(input))
-# # video clip consists of 300 frames (10 seconds at 30 FPS)
-# file_path = '/home/ofoo/MoEViT/kinetics-dataset/k400/train/-_1WRslPhMo_000173_000183.mp4'
-# container = av.open(file_path)
-
-# image_processor = VivitImageProcessor.from_pretrained("google/vivit-b-16x2-kinetics400")
-
-
-
-# # sample 32 frames
-# indices = sample_frame_indices(clip_len=32, frame_sample_rate=1, seg_len=container.streams.video[0].frames)
-# video = read_video_pyav(container=container, indices=indices)
-# inputs = image_processor(list(video), return_tensors="pt") 
-# inputs = inputs['pixel_values']
-
-# print(f'Input to ViViT: {inputs.shape}') # (batch_size, num_frames, channels, height, width) 
-
-# batch_size, num_frames, channels, height, width = inputs.shape
-
-# # model = VivitForVideoClassification.from_pretrained("google/vivit-b-16x2-kinetics400")
-# # print(model(inputs))
-
-# num_tokens = 49  # For instance, if each 224x224 frame is divided into 49 patches.
-# model_dim = 3072  # Hypothetical feature dimension per patch.
-
-# inputs_vivit = inputs
-# inputs_moe = inputs.view(-1, num_tokens, model_dim).to(device)  # Reshape from [1, 32, 3, 224, 224] to [batch_size * num_frames, num_tokens, model_dim]
-# #inputs = inputs.view(batch_size * num_frames, channels, height, width)
-
-
-# print(f'Kinetics 400 Video shape: {video.shape}')
-
-
-# #inputs=inputs.reshape(inputs.shape[1], inputs.shape[3], -1).to(device) # figure out how to undo this, need to fix this INSIDE of the Moe layer (fairscale) source code?
-# #print("Reshaped inputs shape: ", inputs.shape)
-# #try random size
-
-# #what should the input to the model be?
-# output= model(inputs_moe)
-# print(output)

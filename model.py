@@ -64,7 +64,7 @@ from fastkan import FastKAN as KAN
 
 class MLP_CIFAR10(nn.Module):
     def __init__(self):
-        super(MLP, self).__init__()
+        super(MLP_CIFAR10, self).__init__()
         self.layer1 = nn.Linear(32 * 32 * 3, 512)
         self.layer2 = nn.Linear(512, 256)
         self.layer3 = nn.Linear(256, 10)
@@ -78,10 +78,10 @@ class MLP_CIFAR10(nn.Module):
 
 class MLP_CIFAR100(nn.Module):
     def __init__(self):
-        super(MLP, self).__init__()
+        super(MLP_CIFAR100, self).__init__()
         self.layer1 = nn.Linear(32 * 32 * 3, 512)
         self.layer2 = nn.Linear(512, 256)
-        self.layer3 = nn.Linear(256, 10)
+        self.layer3 = nn.Linear(256, 100)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
@@ -92,8 +92,8 @@ class MLP_CIFAR100(nn.Module):
 
 class MLP_MNIST(nn.Module):
     def __init__(self):
-        super(MLP, self).__init__()
-        self.layer1 = nn.Linear(32 * 32 * 3, 512)
+        super(MLP_MNIST, self).__init__()
+        self.layer1 = nn.Linear(28*28, 512)
         self.layer2 = nn.Linear(512, 256)
         self.layer3 = nn.Linear(256, 10)
 
@@ -104,58 +104,100 @@ class MLP_MNIST(nn.Module):
         x = self.layer3(x)
         return x
 
-class KAN_CIFAR10():
-    
-
-class MoE_Layer(nn.Module):
-    def __init__(self, num_experts=4, hidden_size=32, expert_model_config=[2048, 256, 8]):
-        # super(MoE_Layer, self).__init__() 
-        # self.gate = Top2Gate(model_dim=hidden_size, num_experts=num_experts)
-        # model = KAN(expert_model_config)  # Assuming KAN is some kind of network you have defined
-        
-        # self.experts = nn.ModuleList([model for _ in range(num_experts)])
-        # self.moe_layer = MOELayer(self.gate, self.experts)
-        model = 
+class KAN_CIFAR10(nn.Module):
+    def __init__(self):
+        super(KAN_CIFAR10, self).__init__()
+        self.layer1 = KAN([3072, 128, 10], num_grids=3)
 
     def forward(self, x):
-        output = self.moe_layer(x)
+        x = x.view(x.size(0), -1)
+        x = self.layer1(x)
+        return x
+
+class KAN_CIFAR100(nn.Module):
+    def __init__(self):
+        super(KAN_CIFAR100, self).__init__()
+        self.layer1 = KAN([3072, 128, 100], num_grids=3)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        x = self.layer1(x)
+        return x
+
+class KAN_MNIST(nn.Module):
+    def __init__(self):
+        super(MLP, self).__init__()
+        self.layer1 = KAN([28*28, 128, 10], num_grids=3)
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        x = self.layer1(x)
+        return x
+
+##################### MOE ARCHITECTURE #####################
+
+# Define the expert model
+# Define the gating model
+class Gating(nn.Module):
+    def __init__(self, input_dim,
+                 num_experts, dropout_rate=0.1):
+        super(Gating, self).__init__()
+        # Layers
+        self.input_dim = input_dim
+        self.layer1 = nn.Linear(input_dim, 128)
+        self.dropout1 = nn.Dropout(dropout_rate)
+
+        self.layer3 = nn.Linear(128, 64)
+        self.leaky_relu2 = nn.LeakyReLU()
+        self.dropout3 = nn.Dropout(dropout_rate)
+
+        self.layer4 = nn.Linear(64, num_experts)
+
+    def forward(self, x):
+        x = x.view(-1, self.input_dim)
+        x = torch.relu(self.layer1(x))
+        x = self.dropout1(x)
+
+
+        x = self.layer3(x)
+        x = self.leaky_relu2(x)
+        x = self.dropout3(x)
+
+        return torch.softmax(self.layer4(x), dim=1)
+
+class MOE(nn.Module):
+    def __init__(self, trained_experts, input_dim):
+        super(MOE, self).__init__()
+        self.experts = nn.ModuleList(trained_experts)
+
+        # Freezing the experts to ensure that they are not
+        # learning when MoE is training.
+        # Ideally, one can free them before sending the
+        # experts to the MoE; in that case the following three
+        # lines can be commented out.
+        # for expert in self.experts:
+        #     for param in expert.parameters():
+        #         param.requires_grad = False
+
+        num_experts = len(trained_experts)
+        # Assuming all experts have the same input dimension
+        input_dim = 3072
+        self.gating = Gating(input_dim, num_experts)
+
+    def forward(self, x):
+        # Get the weights from the gating network
+        weights = self.gating(x)
+
+        # Calculate the expert outputs
+        outputs = torch.stack(
+            [expert(x) for expert in self.experts], dim=2)
+
+        # Adjust the weights tensor shape to match the expert outputs
+        weights = weights.unsqueeze(1).expand_as(outputs)
+
+        # Multiply the expert outputs with the weights and
+        # sum along the third dimension
+        output = torch.sum(outputs * weights, dim=2)
         return output
-
-
-class MoE_Model(nn.Module):
-    def __init__(self, input_dim=32*32*3, hidden_dim=256, output_dim=10):
-        super(MoE_Model, self).__init__()
-
-        # Define parameters for MoE_Layer if different from defaults
-        self.moelayer1 = MoE_Layer(num_experts=4, hidden_size=96, expert_model_config=[2048, 256, 32])
-        self.moelayer2 = MoE_Layer(num_experts=4, hidden_size=96, expert_model_config=[2048, 256, 32])
-
-        # Assuming KAN is configured properly to handle the dimensions
-        self.dense1 = KAN([input_dim, hidden_dim, output_dim])
-
-    # def forward(self, x):
-    #     output = self.moelayer1(x)
-    #     output = self.moelayer2(output)
-    #     output = output.flatten()
-    #     output = self.dense1(output)
-    #     # final_output = F.softmax(output)
-    #     # final_output_real = torch.argmax(final_output)
-    #     return output
-    def forward(self, x):
-        # Assume x is [batch_size, channels, height, width]
-        # Reshape x to [batch_size, tokens, features] where tokens could be height*width and features could be channels
-        #x = x.view(x.size(0), -1, x.size(1))  # Reshape to [batch_size, height*width, channels]
-        x = x.view(x.size(0), 32, 32*3)
-        # Proceed with processing
-        print(x.shape)
-        print("got here")
-        output = self.moelayer1(x)
-        print(output)
-        output = self.moelayer2(output)
-        # Assuming output needs to be [batch_size, num_classes] for the final layer
-        output = output.view(output.size(0), -1)  # Flatten the output for processing in a dense layer
-        output = self.dense1(output)
-        return F.log_softmax(output, dim=1)  # Ensure log probabilities are output
-
-
+    
 
