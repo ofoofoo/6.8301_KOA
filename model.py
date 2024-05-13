@@ -76,6 +76,7 @@ class MLP_CIFAR10(nn.Module):
         x = self.layer3(x)
         return x
 
+
 class MLP_CIFAR100(nn.Module):
     def __init__(self):
         super(MLP_CIFAR100, self).__init__()
@@ -107,7 +108,7 @@ class MLP_MNIST(nn.Module):
 class KAN_CIFAR10(nn.Module):
     def __init__(self):
         super(KAN_CIFAR10, self).__init__()
-        self.layer1 = KAN([3072, 128, 10], num_grids=3)
+        self.layer1 = KAN([3072, 16, 10], num_grids=4)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
@@ -181,23 +182,30 @@ class MOE(nn.Module):
 
         num_experts = len(trained_experts)
         # Assuming all experts have the same input dimension
-        input_dim = 3072
+        input_dim = input_dim
         self.gating = Gating(input_dim, num_experts)
 
     def forward(self, x):
         # Get the weights from the gating network
         weights = self.gating(x)
+        disc_weights = torch.argmax(weights, dim=-1)
 
         # Calculate the expert outputs
+        # outputs = []
+        # for b in x.shape[0]:
+        #     best_i_expert = disc_weights[b]
+        #     subtract_dummy = 1-weights[b][best_i_expert]
+        #     outputs.append((weights[b][best_i_expert]+subtract_dummy)*self.experts[best_i_expert](x))
+        # output = torch.stack(outputs)
         outputs = torch.stack(
             [expert(x) for expert in self.experts], dim=2)
 
-        # Adjust the weights tensor shape to match the expert outputs
-        weights = weights.unsqueeze(1).expand_as(outputs)
+        # # Adjust the weights tensor shape to match the expert outputs
+        # weights = weights.unsqueeze(1).expand_as(outputs)
 
-        # Multiply the expert outputs with the weights and
-        # sum along the third dimension
-        output = torch.sum(outputs * weights, dim=2)
+        # # Multiply the expert outputs with the weights and
+        # # sum along the third dimension
+        # output = torch.sum(outputs * weights, dim=2)
         return output
     
 

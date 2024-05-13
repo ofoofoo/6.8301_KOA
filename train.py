@@ -240,7 +240,7 @@ def main():
     print(model)
 
     total_params = sum(p.numel() for p in model.parameters())
-    
+    total_params = [total_params]
     print(f'Total parameters: {total_params}')
 
     optimizer = optim.Adam(model.parameters(), lr=args.lr) #args.lr
@@ -264,13 +264,13 @@ def main():
     #Save step loss
     if args.saverun:
         file_path = "/home/ofoo/MoEViT/results/"
-
         if args.cifar10:
             file_path += "cifar10/cifar10_"
         if args.cifar100:
             file_path += "cifar100/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
+        file_path += "baseline_"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 
@@ -281,7 +281,10 @@ def main():
             file_path += "MOEKAN"
         
         torch.save(model.state_dict(), file_path + ".pth") # save model
-        
+        np.save(file_path+"_training_loss.npy", np.array(training_loss))
+        np.save(file_path+"_test_loss.npy", np.array(test_loss_list))
+        np.save(file_path+"_test_accuracy.npy", np.array(test_accuracy_list))
+        np.save(file_path+"_total_params.npy", np.array(total_params))
 
 
     #print(training_loss)
