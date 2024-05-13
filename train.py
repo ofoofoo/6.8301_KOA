@@ -270,7 +270,7 @@ def main():
             file_path += "cifar100/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "baseline_"
+        file_path += "512_"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 

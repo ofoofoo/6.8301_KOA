@@ -108,7 +108,7 @@ class MLP_MNIST(nn.Module):
 class KAN_CIFAR10(nn.Module):
     def __init__(self):
         super(KAN_CIFAR10, self).__init__()
-        self.layer1 = KAN([3072, 16, 10], num_grids=4)
+        self.layer1 = KAN([3072, 512, 10], num_grids=4)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
