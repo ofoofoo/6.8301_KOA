@@ -118,7 +118,7 @@ class KAN_CIFAR10(nn.Module):
 class KAN_CIFAR100(nn.Module):
     def __init__(self):
         super(KAN_CIFAR100, self).__init__()
-        self.layer1 = KAN([3072, 2048, 1024, 512, 256, 128, 64, 32, 16, 100], num_grids=4)
+        self.layer1 = KAN([3072, 2048, 1024, 512, 256, 128, 100], num_grids=4)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
