@@ -265,12 +265,12 @@ def main():
     if args.saverun:
         file_path = "/home/ofoo/MoEViT/results/"
         if args.cifar10:
-            file_path += "cifar10/depth_scaling/cifar10_"
+            file_path += "cifar10/width_scaling/cifar10_"
         if args.cifar100:
             file_path += "cifar100/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "7_"
+        file_path += "2048_"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 
