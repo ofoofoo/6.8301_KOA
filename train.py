@@ -267,10 +267,10 @@ def main():
         if args.cifar10:
             file_path += "cifar10/width_scaling/cifar10_"
         if args.cifar100:
-            file_path += "cifar100/cifar100_"
+            file_path += "cifar100/width_scaling/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "2048_"
+        file_path += "1024_"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 
