@@ -1,20 +1,3 @@
-# '''
-# FOR GATE SOURCE CODE: .local/lib/python3.9/site-packages/fairscale/nn/moe/top2gate.py 
-# FOR MOE LAYER SOURCE CODE: .local/lib/python3.9/site-packages/fairscale/nn/moe/moe_layer.py
-# '''
-
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import torch.distributed as dist
-# from fairscale.nn import MOELayer, Top2Gate
-# import os
-
-'''
-FOR GATE SOURCE CODE: .local/lib/python3.9/site-packages/fairscale/nn/moe/top2gate.py 
-FOR MOE LAYER SOURCE CODE: .local/lib/python3.9/site-packages/fairscale/nn/moe/moe_layer.py
-'''
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -34,7 +17,6 @@ from soft_moe_pytorch import SoftMoE
 os.environ['MASTER_ADDR'] = 'localhost'
 os.environ['MASTER_PORT'] = '12355'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
 backend = 'nccl' if device.type == 'cuda' else 'gloo'
 dist.init_process_group(backend=backend, init_method='env://', rank=0, world_size=1)
 
@@ -94,7 +76,7 @@ def test(model, device, test_loader):
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, len(test_loader.dataset),
         100. * correct / len(test_loader.dataset)))
-    return test_loss
+    return test_loss, correct / len(test_loader.dataset)
 
 def main():
     
@@ -155,7 +137,7 @@ def main():
     parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                         help='how many batches to wait before logging training status')
     
-    parser.add_argument('--save-model', action='store_true', default=False,
+    parser.add_argument('--saverun', action='store_true', default=False,
                         help='For Saving the current Model')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -182,8 +164,6 @@ def main():
 
 
     # DATA
-
-
 
     if args.cifar10:
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -269,14 +249,41 @@ def main():
     
     training_loss = []
     test_loss_list = []
+    test_accuracy_list = []
     for epoch in range(1, args.epochs + 1):
         step_loss = train(args, model, device, train_loader, optimizer, epoch)
         training_loss += step_loss
-        test_loss = test(model, device, test_loader)
+        test_loss, test_accuracy = test(model, device, test_loader)
+        test_accuracy_list.append(test_accuracy)
         test_loss_list.append(test_loss)
         scheduler.step()
-        
+    
+    # Save run metrics:
+    # Training loss, test loss, test accuracy, total parameters
+
     #Save step loss
+    if args.saverun:
+        file_path = "/home/ofoo/MoEViT/results/"
+
+        if args.cifar10:
+            file_path += "cifar10/cifar10_"
+        if args.cifar100:
+            file_path += "cifar100/cifar100_"
+        if args.MNIST:
+            file_path += "mnist/mnist_"
+        if args.MLP:
+            file_path += "MLP"
+        if args.KAN: 
+            file_path += "KAN"
+        if args.MOEMLP:
+            file_path += "MOEMLP"
+        if args.MOEKAN:
+            file_path += "MOEKAN"
+        
+        torch.save(model.state_dict(), file_path + ".pth") # save model
+        
+
+
     #print(training_loss)
     #print(test_loss)
 
