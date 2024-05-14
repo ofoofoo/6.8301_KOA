@@ -22,37 +22,63 @@ from urllib.request import urlopen
 from PIL import Image
 import os
 import sys
+import re
 
 directory = '/home/ofoo/MoEViT/results/cifar10/mixers'
 dir = os.listdir(directory)
 import os
 import numpy as np
 
-# Directory containing the .npy files
-
-# List all files in the directory
 files = os.listdir(directory)
 
-# Filter for files that end with 'total_params.npy'
 total_params_files = [file for file in files if file.endswith('test_accuracy.npy')]
 
-# Initialize a list to hold the arrays
-arrays = []
-
-# Load each array and append to the list
+arrays = {}
 for file in total_params_files:
     file_path = os.path.join(directory, file)
-    print(file_path)
     array = np.load(file_path)
-    arrays.append(array)
+    pattern = r'([^/]+)_test_accuracy\.npy$'
+    match = re.search(pattern, file_path)
+    result = match.group(1)
+    arrays[result] = array
 
-# Now arrays contains all the numpy arrays from the files ending with 'total_params.npy'
 print(arrays)
 
-for index, array in enumerate(arrays):
-    plt.plot(array, label=f'{index}')
+colors = {
+    "S4MLPMixer": "red",
+    "S8MLPMixer": "green",
+    "S16MLPMixer": "orange",
+    "L4MLPMixer": "blue",
+    "L8MLPMixer": "purple",
+    "L16MLPMixer": "gray",
+}
+
+epochs = np.arange(1, 21)
+linewidth = 1
+for key, value in arrays.items():
+    value = value * 100.
+    if 'MLPMixer' in key:
+        # Plot MLPMixer models as solid lines
+        if 'L4' in key:
+            plt.plot(epochs, value, '--', label=key, color=colors[key], alpha = 1, linewidth = linewidth)
+        else:
+            plt.plot(epochs, value, '--', label=key, color=colors[key], alpha=0.5, linewidth = linewidth)
+
+    elif 'KANMixer' in key:
+        # Extract the corresponding MLPMixer color and plot as dashed
+        base_model = key.replace('KANMixer', 'MLPMixer')
+        if 'S4' in key:
+            plt.plot(epochs, value, label=key, color=colors[base_model], alpha=1, linewidth = linewidth)
+        else:
+            plt.plot(epochs, value, label=key, color=colors[base_model], alpha=0.5, linewidth = linewidth)
 
 save_directory = '/home/ofoo/MoEViT/results/cifar10/mixers'
-plt.legend()
-file_path = os.path.join(save_directory, 'plot_bob.png')
+plt.title("KANMixer/MLPMixer Top-1 Test Accuracy")
+plt.xlabel("Epochs")
+plt.ylabel("Test Accuracy (%)")
+plt.legend(loc='best', ncol=2)
+plt.grid(axis='y')
+plt.xticks(np.arange(1, 21))
+plt.yticks([25, 30, 35, 40, 45, 50, 55, 60, 65, 70])
+file_path = os.path.join(save_directory, 'mixer_comparison.png')
 plt.savefig(file_path)
