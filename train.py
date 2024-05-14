@@ -87,6 +87,10 @@ def main():
     parser.add_argument('--cifar10', action='store_true', default=False,
                         help='whether to use cifar-10 dataset')
 
+    parser.add_argument('--mixer', action='store_true', default=False,
+                        help='whether to use cifar-10 dataset')
+    parser.add_argument('--kanmixer', action='store_true', default=False,
+                        help='whether to use cifar-10 dataset')
     parser.add_argument('--cifar100', action='store_true', default=False,
                         help='whether to use cifar-100 dataset')    
                                         
@@ -188,6 +192,11 @@ def main():
         elif args.MOEKAN:
             trained_experts = [KAN_CIFAR10() for _ in range(args.num_experts)]
             model = MOE(trained_experts, 3072)
+
+        elif args.kanmixer:
+            model = CIFAR10_KAN_Mixer().to(device)
+        elif args.mixer:
+            model = CIFAR10_MLP_Mixer().to(device)
     
     elif args.cifar100:
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -265,12 +274,12 @@ def main():
     if args.saverun:
         file_path = "/home/ofoo/MoEViT/results/"
         if args.cifar10:
-            file_path += "cifar10/experts_scan/cifar10_"
+            file_path += "cifar10/mixers/"
         if args.cifar100:
             file_path += "cifar100/depth_scaling/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "7_"
+        file_path += "L16"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 
@@ -279,6 +288,10 @@ def main():
             file_path += "MOEMLP"
         if args.MOEKAN:
             file_path += "MOEKAN"
+        if args.kanmixer:
+            file_path += "KANMixer"
+        if args.mixer:
+            file_path += "MLPMixer"
         
         #torch.save(model.state_dict(), file_path + ".pth") # save model
         np.save(file_path+"_training_loss.npy", np.array(training_loss))
