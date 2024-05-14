@@ -2,16 +2,17 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.distributed as dist
+import torch.nn.functional as F
 import torchvision
 import torchvision.transforms as transforms
-from fairscale.nn import MOELayer, Top2Gate
+from torchvision import datasets, transforms
+from torch.optim.lr_scheduler import StepLR
+from torchinfo import summary
 import os
 import av
-from transformers import VivitImageProcessor, VivitForVideoClassification
 import numpy as np
-from transformers import VivitConfig, VivitModel
-from soft_moe_pytorch import SoftMoE
-
+import argparse
+from model import *
 
 # Setup distributed environment
 os.environ['MASTER_ADDR'] = 'localhost'
@@ -19,20 +20,6 @@ os.environ['MASTER_PORT'] = '12355'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 backend = 'nccl' if device.type == 'cuda' else 'gloo'
 dist.init_process_group(backend=backend, init_method='env://', rank=0, world_size=1)
-
-
-###### Model - MOE we will be using 
-
-#model = MoEModel(num_experts=8, hidden_size=32).to(device)
-import argparse
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-from torch.optim.lr_scheduler import StepLR
-from torchinfo import summary
-from model import *
 
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -274,12 +261,11 @@ def main():
     if args.saverun:
         file_path = "/home/ofoo/MoEViT/results/"
         if args.cifar10:
-            file_path += "cifar10/mixers/"
+            file_path += "cifar10/width_scaling/cifar10_"
         if args.cifar100:
             file_path += "cifar100/depth_scaling/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "S16"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 

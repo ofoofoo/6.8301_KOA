@@ -5,59 +5,24 @@ import torch.distributed as dist
 import av
 import numpy as np
 import torchvision
+import torchvision.transforms as transforms
 from huggingface_hub import hf_hub_download
 from torch import einsum
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-
 import matplotlib.pyplot as plt
 from datasets import load_dataset
 import torch.nn.functional as F
 from einops import rearrange, pack, unpack
 from functools import partial
 from torchvision import datasets, transforms
-
-
-np.random.seed(0)
-
-# https://github.com/lucidrains/mlp-mixer-pytorch/blob/main/mlp_mixer_pytorch/mlp_mixer_pytorch.py
-from torch import nn
-from functools import partial
-from einops.layers.torch import Rearrange, Reduce
-
-
-# https://openreview.net/forum?id=TVHS5Y4dNvM
-
-import torch.nn as nn
-
 import timm
-
+from einops.layers.torch import Rearrange, Reduce
 from urllib.request import urlopen
 from PIL import Image
-
-from datasets import load_dataset
-
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.distributed as dist
-import torchvision
-import torchvision.transforms as transforms
 import os
-import av
-import numpy as np
-
-
-# Setup distributed environment
-# os.environ['MASTER_ADDR'] = 'localhost'
-# os.environ['MASTER_PORT'] = '12355'
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cpu")
-# backend = 'nccl' if device.type == 'cuda' else 'gloo'
-# dist.init_process_group(backend=backend, init_method='env://', rank=0, world_size=1)
-
-import torch
 import sys
+
 sys.path.append('/home/ofoo/MoEViT/fast-kan/fastkan')
 
 from fastkan import FastKAN as KAN
@@ -65,13 +30,15 @@ from fastkan import FastKAN as KAN
 class MLP_CIFAR10(nn.Module):
     def __init__(self):
         super(MLP_CIFAR10, self).__init__()
-        self.layer1 = nn.Linear(32 * 32 * 3, 1024)
-        self.layer2 = nn.Linear(1024, 10)
+        self.layer1 = nn.Linear(32 * 32 * 3, 512)
+        self.layer2 = nn.Linear(512, 256)
+        self.layer3 = nn.Linear(256, 10)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
         x = torch.relu(self.layer1(x))
-        x = self.layer2(x)
+        x = torch.relu(self.layer2(x))
+        x = self.layer3(x)
         return x
 
 
@@ -205,6 +172,8 @@ class MOE(nn.Module):
         # sum along the third dimension
         output = torch.sum(outputs * weights, dim=2)
         return output
+
+##### KAN-MIXER CODE #####
 
 from torch import nn
 from functools import partial
