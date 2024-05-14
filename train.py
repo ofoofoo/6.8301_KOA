@@ -279,7 +279,7 @@ def main():
             file_path += "cifar100/depth_scaling/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "L4"
+        file_path += "S16"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 

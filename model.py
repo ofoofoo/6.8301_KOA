@@ -313,9 +313,9 @@ class CIFAR10_KAN_Mixer(nn.Module):
         self.mixer = KANMixer(
             image_size = (32, 32),
             channels = 3,
-            patch_size = 4,
-            dim = 768,
-            depth = 10,
+            patch_size = 16,
+            dim = 512,
+            depth = 4,
             num_classes = 10
         )
 
@@ -359,7 +359,7 @@ class CIFAR10_KAN_Mixer(nn.Module):
 #             dim = 512,
 #             depth = 4,
 #             num_classes = 10
-# S8:
+# S4:
 # image_size = (32, 32),
 #             channels = 3,
 #             patch_size = 4,
