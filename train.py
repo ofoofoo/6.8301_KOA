@@ -44,6 +44,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
+        #print(data.shape)
         output = model(data)
         
         loss = F.cross_entropy(output, target)
@@ -182,12 +183,11 @@ def main():
 
         elif args.MOEMLP:
             trained_experts = [MLP_CIFAR10() for _ in range(args.num_experts)]
-            print(trained_experts)
-            model = MOE(trained_experts, args.num_experts)
+            model = MOE(trained_experts, 3072)
 
         elif args.MOEKAN:
             trained_experts = [KAN_CIFAR10() for _ in range(args.num_experts)]
-            model = MOE(trained_experts, args.num_experts)
+            model = MOE(trained_experts, 3072)
     
     elif args.cifar100:
         transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
@@ -265,12 +265,12 @@ def main():
     if args.saverun:
         file_path = "/home/ofoo/MoEViT/results/"
         if args.cifar10:
-            file_path += "cifar10/width_scaling/cifar10_"
+            file_path += "cifar10/experts_scan/cifar10_"
         if args.cifar100:
             file_path += "cifar100/depth_scaling/cifar100_"
         if args.MNIST:
             file_path += "mnist/mnist_"
-        file_path += "7_"
+        file_path += "2_"
         if args.MLP:
             file_path += "MLP"
         if args.KAN: 
@@ -280,7 +280,7 @@ def main():
         if args.MOEKAN:
             file_path += "MOEKAN"
         
-        torch.save(model.state_dict(), file_path + ".pth") # save model
+        #torch.save(model.state_dict(), file_path + ".pth") # save model
         np.save(file_path+"_training_loss.npy", np.array(training_loss))
         np.save(file_path+"_test_loss.npy", np.array(test_loss_list))
         np.save(file_path+"_test_accuracy.npy", np.array(test_accuracy_list))

@@ -65,15 +65,13 @@ from fastkan import FastKAN as KAN
 class MLP_CIFAR10(nn.Module):
     def __init__(self):
         super(MLP_CIFAR10, self).__init__()
-        self.layer1 = nn.Linear(32 * 32 * 3, 512)
-        self.layer2 = nn.Linear(512, 256)
-        self.layer3 = nn.Linear(256, 10)
+        self.layer1 = nn.Linear(32 * 32 * 3, 1024)
+        self.layer2 = nn.Linear(1024, 10)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
         x = torch.relu(self.layer1(x))
-        x = torch.relu(self.layer2(x))
-        x = self.layer3(x)
+        x = self.layer2(x)
         return x
 
 
@@ -108,7 +106,7 @@ class MLP_MNIST(nn.Module):
 class KAN_CIFAR10(nn.Module):
     def __init__(self):
         super(KAN_CIFAR10, self).__init__()
-        self.layer1 = KAN([3072, 2048, 10], num_grids=4)
+        self.layer1 = KAN([3072, 1024, 10], num_grids=4)
 
     def forward(self, x):
         x = x.view(x.size(0), -1)
@@ -145,17 +143,19 @@ class Gating(nn.Module):
         super(Gating, self).__init__()
         # Layers
         self.input_dim = input_dim
-        self.layer1 = nn.Linear(input_dim, 128)
+        self.layer1 = nn.Linear(input_dim, 512)
         self.dropout1 = nn.Dropout(dropout_rate)
 
-        self.layer3 = nn.Linear(128, 64)
+        self.layer3 = nn.Linear(512, 128)
         self.leaky_relu2 = nn.LeakyReLU()
         self.dropout3 = nn.Dropout(dropout_rate)
 
-        self.layer4 = nn.Linear(64, num_experts)
+        self.layer4 = nn.Linear(128, num_experts)
 
     def forward(self, x):
+   
         x = x.view(-1, self.input_dim)
+      
         x = torch.relu(self.layer1(x))
         x = self.dropout1(x)
 
@@ -183,29 +183,26 @@ class MOE(nn.Module):
         num_experts = len(trained_experts)
         # Assuming all experts have the same input dimension
         input_dim = input_dim
+
         self.gating = Gating(input_dim, num_experts)
+        #print('gating')
+        #print(self.gating)
+
+        self.input_dim = input_dim
 
     def forward(self, x):
         # Get the weights from the gating network
-        weights = self.gating(x)
-        disc_weights = torch.argmax(weights, dim=-1)
+        x_weights = x.view(-1, 32*32*3)
 
+        # Get the weights from the gating network
+        weights = self.gating(x_weights)
         # Calculate the expert outputs
-        # outputs = []
-        # for b in x.shape[0]:
-        #     best_i_expert = disc_weights[b]
-        #     subtract_dummy = 1-weights[b][best_i_expert]
-        #     outputs.append((weights[b][best_i_expert]+subtract_dummy)*self.experts[best_i_expert](x))
-        # output = torch.stack(outputs)
         outputs = torch.stack(
             [expert(x) for expert in self.experts], dim=2)
-
-        # # Adjust the weights tensor shape to match the expert outputs
-        # weights = weights.unsqueeze(1).expand_as(outputs)
-
-        # # Multiply the expert outputs with the weights and
-        # # sum along the third dimension
-        # output = torch.sum(outputs * weights, dim=2)
+        # Adjust the weights tensor shape to match the expert outputs
+        weights = weights.unsqueeze(1).expand_as(outputs)
+        # Multiply the expert outputs with the weights and
+        # sum along the third dimension
+        output = torch.sum(outputs * weights, dim=2)
         return output
-    
 
